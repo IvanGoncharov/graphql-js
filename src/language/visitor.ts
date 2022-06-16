@@ -318,7 +318,9 @@ export function visit(
       if (!isNode(node)) {
         throw new Error(`Invalid AST Node: ${inspect(node)}.`);
       }
-      const visitFn = getVisitFn(visitor, node.kind, isLeaving);
+      const visitFn = isLeaving
+        ? getEnterLeaveForKind(visitor, node.kind).leave
+        : getEnterLeaveForKind(visitor, node.kind).enter;
       result = visitFn?.call(visitor, node, key, parent, path, ancestors);
 
       if (result === BREAK) {
