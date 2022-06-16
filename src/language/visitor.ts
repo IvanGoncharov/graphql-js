@@ -319,27 +319,25 @@ export function visit(
         throw new Error(`Invalid AST Node: ${inspect(node)}.`);
       }
       const visitFn = getVisitFn(visitor, node.kind, isLeaving);
-      if (visitFn) {
-        result = visitFn.call(visitor, node, key, parent, path, ancestors);
+      result = visitFn?.call(visitor, node, key, parent, path, ancestors);
 
-        if (result === BREAK) {
-          break;
+      if (result === BREAK) {
+        break;
+      }
+
+      if (result === false) {
+        if (!isLeaving) {
+          path.pop();
+          continue;
         }
-
-        if (result === false) {
-          if (!isLeaving) {
+      } else if (result !== undefined) {
+        edits.push([key, result]);
+        if (!isLeaving) {
+          if (isNode(result)) {
+            node = result;
+          } else {
             path.pop();
             continue;
-          }
-        } else if (result !== undefined) {
-          edits.push([key, result]);
-          if (!isLeaving) {
-            if (isNode(result)) {
-              node = result;
-            } else {
-              path.pop();
-              continue;
-            }
           }
         }
       }
