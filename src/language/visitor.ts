@@ -256,6 +256,15 @@ export function visit(
   visitor: ASTVisitor | ASTReducer<any>,
   visitorKeys: ASTVisitorKeyMap = QueryDocumentKeys,
 ): any {
+  const enterLeaveMap = new Map<
+    keyof ASTKindToNode,
+    EnterLeaveVisitor<ASTNode>
+  >();
+
+  for (const kind of Object.values(Kind)) {
+    enterLeaveMap.set(kind, getEnterLeaveForKind(visitor, kind));
+  }
+
   /* eslint-disable no-undef-init */
   let stack: any = undefined;
   let inArray = Array.isArray(root);
@@ -319,8 +328,9 @@ export function visit(
         throw new Error(`Invalid AST Node: ${inspect(node)}.`);
       }
       const visitFn = isLeaving
-        ? getEnterLeaveForKind(visitor, node.kind).leave
-        : getEnterLeaveForKind(visitor, node.kind).enter;
+        ? enterLeaveMap.get(node.kind)?.leave
+        : enterLeaveMap.get(node.kind)?.enter;
+
       result = visitFn?.call(visitor, node, key, parent, path, ancestors);
 
       if (result === BREAK) {
