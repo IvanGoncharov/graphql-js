@@ -256,15 +256,6 @@ export function visit(
   visitor: ASTVisitor | ASTReducer<any>,
   visitorKeys: ASTVisitorKeyMap = QueryDocumentKeys,
 ): any {
-  const enterLeaveMap = new Map<
-    keyof ASTKindToNode,
-    EnterLeaveVisitor<ASTNode>
-  >();
-
-  for (const kind of Object.values(Kind)) {
-    enterLeaveMap.set(kind, getEnterLeaveForKind(visitor, kind));
-  }
-
   /* eslint-disable no-undef-init */
   let stack: any = undefined;
   let inArray = Array.isArray(root);
@@ -327,29 +318,28 @@ export function visit(
       if (!isNode(node)) {
         throw new Error(`Invalid AST Node: ${inspect(node)}.`);
       }
-      const visitFn = isLeaving
-        ? enterLeaveMap.get(node.kind)?.leave
-        : enterLeaveMap.get(node.kind)?.enter;
+      const visitFn = getVisitFn(visitor, node.kind, isLeaving);
+      if (visitFn) {
+        result = visitFn.call(visitor, node, key, parent, path, ancestors);
 
-      result = visitFn?.call(visitor, node, key, parent, path, ancestors);
-
-      if (result === BREAK) {
-        break;
-      }
-
-      if (result === false) {
-        if (!isLeaving) {
-          path.pop();
-          continue;
+        if (result === BREAK) {
+          break;
         }
-      } else if (result !== undefined) {
-        edits.push([key, result]);
-        if (!isLeaving) {
-          if (isNode(result)) {
-            node = result;
-          } else {
+
+        if (result === false) {
+          if (!isLeaving) {
             path.pop();
             continue;
+          }
+        } else if (result !== undefined) {
+          edits.push([key, result]);
+          if (!isLeaving) {
+            if (isNode(result)) {
+              node = result;
+            } else {
+              path.pop();
+              continue;
+            }
           }
         }
       }
