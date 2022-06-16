@@ -390,31 +390,16 @@ export function visit(
 export function visitInParallel(
   visitors: ReadonlyArray<ASTVisitor>,
 ): ASTVisitor {
-  const skipping = new Array(visitors.length).fill(null);
-  const mergedVisitor = Object.create(null);
+  const skipping = new Array(visitors.length);
 
-  for (const kind of Object.values(Kind)) {
-    let hasVisitor = false;
-    const enterList = new Array(visitors.length).fill(undefined);
-    const leaveList = new Array(visitors.length).fill(undefined);
-
-    for (let i = 0; i < visitors.length; ++i) {
-      const { enter, leave } = getEnterLeaveForKind(visitors[i], kind);
-      hasVisitor ||= enter != null || leave != null;
-      enterList[i] = enter;
-      leaveList[i] = leave;
-    }
-
-    if (!hasVisitor) {
-      continue;
-    }
-
-    const mergedEnterLeave: EnterLeaveVisitor<ASTNode> = {
-      enter(...args) {
-        const node = args[0];
-        for (let i = 0; i < visitors.length; i++) {
-          if (skipping[i] === null) {
-            const result = enterList[i]?.apply(visitors[i], args);
+  return {
+    enter(...args) {
+      const node = args[0];
+      for (let i = 0; i < visitors.length; i++) {
+        if (skipping[i] == null) {
+          const fn = getVisitFn(visitors[i], node.kind, /* isLeaving */ false);
+          if (fn) {
+            const result = fn.apply(visitors[i], args);
             if (result === false) {
               skipping[i] = node;
             } else if (result === BREAK) {
@@ -424,28 +409,27 @@ export function visitInParallel(
             }
           }
         }
-      },
-      leave(...args) {
-        const node = args[0];
-        for (let i = 0; i < visitors.length; i++) {
-          if (skipping[i] === null) {
-            const result = leaveList[i]?.apply(visitors[i], args);
+      }
+    },
+    leave(...args) {
+      const node = args[0];
+      for (let i = 0; i < visitors.length; i++) {
+        if (skipping[i] == null) {
+          const fn = getVisitFn(visitors[i], node.kind, /* isLeaving */ true);
+          if (fn) {
+            const result = fn.apply(visitors[i], args);
             if (result === BREAK) {
               skipping[i] = BREAK;
             } else if (result !== undefined && result !== false) {
               return result;
             }
-          } else if (skipping[i] === node) {
-            skipping[i] = null;
           }
+        } else if (skipping[i] === node) {
+          skipping[i] = null;
         }
-      },
-    };
-
-    mergedVisitor[kind] = mergedEnterLeave;
-  }
-
-  return mergedVisitor;
+      }
+    },
+  };
 }
 
 /**
